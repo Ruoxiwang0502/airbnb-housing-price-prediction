@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Housing Trends Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    /* Dashboard */
+    body {
+      background-color: #F3F4F6;
+    }
+
+    .dashboard-wrapper {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+    }
+
+    /* Header */
+    .dashboard-header {
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .dashboard-header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #111827;
+      margin: 0 0 8px 0;
+    }
+    .dashboard-header p {
+      color: #6B7280;
+      margin: 0;
+    }
+
+    /* Glass Control Bar */
+    .filters-sticky-bar {
+      position: sticky;
+      top: 70px;
+      z-index: 90;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 16px;
+      padding: 16px 24px;
+      margin-bottom: 32px;
+      box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .filters-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      flex: 1;
+      align-items: center;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-group label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      color: #6B7280;
+    }
+
+
+    .filter-group select {
+      height: 36px;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 0 32px 0 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #111827;
+      background-color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-group select:hover {
+      border-color: #2563EB;
+    }
+
+    /* Range Slider  */
+    .filter-group.price-range-group {
+      min-width: 200px;
+    }
+    input[type="range"] {
+      accent-color: #2563EB;
+    }
+
+    /* 2. Bento Grid  */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr); /* 12列网格系统 */
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    /* card style */
+    .chart-card, .kpi-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+      border: 1px solid #E5E7EB;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-card:hover, .kpi-card:hover {
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
+    }
+
+    /* 标题样式 */
+    .chart-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #374151;
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chart-card h3::before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 16px;
+      background: #2563EB;
+      border-radius: 2px;
+    }
+
+    .chart-container, .map-chart-container {
+      width: 100%;
+      height: 400px;
+      min-height: 400px;
+      border-radius: 12px;
+    }
+    
+    /* Full-width charts (span 12) can be taller */
+    .span-12 .chart-container {
+      height: 500px;
+      min-height: 500px;
+    }
+
+    /* 3. Span Utility */
+    .span-12 { grid-column: span 12; } /* 全宽 */
+    .span-8  { grid-column: span 8; }  /* 2/3 宽 */
+    .span-6  { grid-column: span 6; }  /* 1/2 宽 */
+    .span-4  { grid-column: span 4; }  /* 1/3 宽 */
+    .span-3  { grid-column: span 3; }  /* 1/4 宽 */
+
+    /* KPI 特殊样式 */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .kpi-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: #111827;
+      margin: 8px 0;
+      letter-spacing: -0.02em;
+    }
+    .kpi-label { font-size: 13px; font-weight: 600; color: #6B7280; text-transform: uppercase; }
+    .kpi-change { font-size: 13px; font-weight: 500; }
+
+
+    .section-divider {
+      grid-column: span 12;
+      margin: 32px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .section-divider h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+      white-space: nowrap;
+    }
+    .section-divider::after {
+      content: "";
+      height: 1px;
+      width: 100%;
+      background: #E5E7EB;
+    }
+
+
+    @media (max-width: 1024px) {
+      .span-8, .span-6, .span-4, .span-3 { grid-column: span 12; } /* 手机上全变成单列 */
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .filters-sticky-bar { top: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="nav-wrap">
+  <nav class="nav">
+    <div class="brand">
+      <svg class="brand-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 21V9L12 2L21 9V21H14V14H10V21H3Z" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 10L12 6L16 10" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>CalHousing</span>
+    </div>
+    <a href="index.html">Home</a>
+    <a href="introduction.html">Introduction</a>
+    <a href="predictor.html">Housing Prediction</a>
+    <a href="airbnb_predictor.html">Airbnb Prediction</a>
+    <a href="map.html">Map</a>
+    <a href="trends.html" class="active">Trends Dashboard</a>
+  </nav>
+</div>
+
+<div class="dashboard-wrapper">
+
+  <div class="dashboard-header">
+    <h1>Housing & Airbnb Market Intelligence</h1>
+    <p>Real-time analytics and trends across California counties.</p>
+  </div>
+
+  <div class="filters-sticky-bar">
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Dataset Focus</label>
+        <select id="datasetFilter">
+          <option value="all">All Market Data</option>
+          <option value="housing">Housing Only</option>
+          <option value="airbnb">Airbnb Only</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Region (County)</label>
+        <select id="countyFilter">
+          <option value="all">All Counties</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Configuration</label>
+        <select id="bedroomFilter">
+          <option value="all">Any Bedrooms</option>
+          <option value="1">1 Bedroom</option>
+          <option value="2">2 Bedrooms</option>
+          <option value="3">3 Bedrooms</option>
+          <option value="4">4+ Bedrooms</option>
+        </select>
+      </div>
+      <div class="filter-group price-range-group">
+        <label>Max Price Cap</label>
+        <input type="range" id="priceRange" min="0" max="5000000" step="50000" value="5000000">
+        <span id="priceRangeValue" style="font-size:12px; font-weight:600; color:#2563EB">$0 - 5M+</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="kpiCards">
+    <div class="kpi-card">
+      <div class="kpi-label">Median Home Price</div>
+      <div class="kpi-value" id="medianPrice">$0</div>
+      <div class="kpi-change" id="priceChange" style="color:#059669">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Airbnb Nightly</div>
+      <div class="kpi-value" id="avgAirbnbPrice">$0</div>
+      <div class="kpi-change" id="airbnbPriceChange" style="color:#2563EB">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Listings</div>
+      <div class="kpi-value" id="totalListings">0</div>
+      <div class="kpi-change" id="listingsChange">Housing & Airbnb</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Home Size</div>
+      <div class="kpi-value" id="avgSize">0 sq ft</div>
+      <div class="kpi-change" id="sizeChange">--</div>
+    </div>
+  </div>
+
+  <div class="section-divider">
+    <h2>🏠 Housing Market Analysis</h2>
+  </div>
+
+  <div class="bento-grid">
+    <div class="chart-card span-6">
+      <h3>Price Trends Over Regions</h3>
+      <div class="chart-container" id="priceOverTime"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Avg Price by County</h3>
+      <div class="chart-container" id="priceByCounty"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Living Space vs. Price</h3>
+      <div class="chart-container" id="sizeVsPrice"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Price Distribution</h3>
+      <div class="chart-container" id="priceDistribution"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Impact of Crime Rate</h3>
+      <div class="chart-container" id="priceVsCrime"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Income Correlation</h3>
+      <div class="chart-container" id="priceVsIncome"></div>
+    </div>
+  </div>
+
+  <div class="section-divider">
+    <h2>🌙 Airbnb Market Analysis</h2>
+  </div>
+
+  <div class="bento-grid">
+
+    <div class="chart-card span-6">
+      <h3>Room Type Distribution</h3>
+      <div class="chart-container" id="airbnbRoomType"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Review Scores Impact</h3>
+      <div class="chart-container" id="priceVsReviews"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Bedroom Premium</h3>
+      <div class="chart-container" id="airbnbBedrooms"></div>
+    </div>
+
+    <div class="chart-card span-6">
+      <h3>Price Distribution</h3>
+      <div class="chart-container" id="airbnbPriceDist"></div>
+    </div>
+  </div>
+
+</div> <div class="footer">© 2025 California Housing (Team 12). For course demo only.</div>
+
+<script>
+  // Data storage
+  let housingData = [];
+  let airbnbData = [];
+  let filteredHousingData = [];
+  let filteredAirbnbData = [];
+
+  // Housing counties filter
+  const housingCounties = ['Los Angeles', 'Fresno', 'San Diego', 'Sacramento', 'San Francisco', 'Santa Clara', 'Alameda'];
+
+  // Airbnb counties filter
+  const airbnbCounties = ['Los Angeles', 'San Diego', 'Santa Clara', 'San Mateo', 'Alameda', 'Santa Cruz', 'Monterey'];
+
+  // Chart instances
+  const charts = {};
+
+  // Formatters
+  function formatNumber(num) {
+    if (num === null || num === undefined || isNaN(num)) return '0';
+    const absNum = Math.abs(num);
+    if (absNum >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (absNum >= 1000) return (num / 1000).toFixed(0) + 'k';
+    return Math.round(num).toString();
+  }
+
+  // Formatter for axis labels (for ECharts)
+  function formatAxisLabel(value) {
+    if (value === null || value === undefined || isNaN(value)) return '0';
+    const absValue = Math.abs(value);
+    if (absValue >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+    if (absValue >= 1000) return (value / 1000).toFixed(0) + 'K';
+    return Math.round(value).toString();
+  }
+
+  function formatCurrency(num) {
+    if (num === null || num === undefined || isNaN(num)) return '$0';
+    const absNum = Math.abs(num);
+    if (absNum >= 1000000) return '$' + (num / 1000000).toFixed(1) + 'M';
+    if (absNum >= 1000) return '$' + (num / 1000).toFixed(0) + 'k';
+    return '$' + Math.round(num).toString();
+  }
+
+  // Init
+  document.addEventListener('DOMContentLoaded', function() {
+    loadData();
+    setupFilters();
+  });
+
+  function setupFilters() {
+    const priceRange = document.getElementById('priceRange');
+    const priceRangeValue = document.getElementById('priceRangeValue');
+    priceRange.addEventListener('input', function() {
+      const max = parseInt(this.value);
+      priceRangeValue.textContent = `$0 - ${formatCurrency(max)}`;
+      applyFilters();
+    });
+
+    document.getElementById('datasetFilter').addEventListener('change', applyFilters);
+    document.getElementById('countyFilter').addEventListener('change', applyFilters);
+    document.getElementById('bedroomFilter').addEventListener('change', applyFilters);
+  }
+
+  function loadData() {
+    // Housing Data
+    Papa.parse('data/housingvars.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: function(results) {
+        housingData = results.data.filter(row => {
+          const county = (row.County || row.county || '').trim();
+          const price = row.Price || row.price || '';
+          return housingCounties.includes(county) && price && !isNaN(parseFloat(price));
+        }).map(row => ({
+          price: parseFloat(row.Price || row.price || 0),
+          beds: parseInt(row.Beds || row.beds || 0),
+          baths: parseFloat(row.Baths || row.baths || 0),
+          livingSpace: parseFloat(row['Living Space'] || row['living space'] || 0),
+          county: (row.County || row.county || '').trim(),
+          crimeRate: parseFloat(row['Crime Rate'] || row['crime rate'] || 0),
+          population: parseFloat(row.Population || row.population || 0),
+          householdIncome: parseFloat(row['City Average Household Income'] || row['city average household income'] || 0),
+          city: (row.City || row.city || '').trim()
+        })).filter(d => d.price > 0 && d.county);
+
+        filteredHousingData = [...housingData];
+        updateCountyFilter();
+        updateCharts();
+        updateKPIs();
+      }
+    });
+
+    // Airbnb Data
+    Papa.parse('data/airbnbvars.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: function(results) {
+        airbnbData = results.data.filter(row => {
+          const county = (row.county || '').trim();
+          const airbnbPrice = row.price || '';
+          return airbnbCounties.includes(county) && airbnbPrice && !isNaN(parseFloat(airbnbPrice));
+        }).map(row => ({
+          price: parseFloat(row.price || 0),
+          roomType: (row.room_type || '').trim(),
+          bathrooms: parseFloat(row.bathrooms || 0),
+          bedrooms: parseFloat(row.bedrooms || 0),
+          beds: parseFloat(row.beds || 0),
+          reviewScores: parseFloat(row.review_scores_location || 0),
+          county: (row.county || '').trim(),
+          city: (row.city || '').trim()
+        })).filter(d => d.price > 0 && d.price <= 3000 && d.county);
+
+        filteredAirbnbData = [...airbnbData];
+        updateCountyFilter();
+        updateCharts();
+        updateKPIs();
+        loadMaps();
+      }
+    });
+  }
+
+  function loadMaps() {
+    fetch('data/ca_counties.geojson')
+      .then(response => response.json())
+      .then(geojson => {
+        updateHousingMap(geojson);
+        updateAirbnbMap(geojson);
+      })
+      .catch(err => console.log('GeoJSON Error'));
+  }
+
+  // Simplified map updates 
+  function updateHousingMap(geojson) {
+    const el = document.getElementById('housingMap');
+    if (!el) return;
+    if (!charts.housingMap) charts.housingMap = echarts.init(el);
+
+    const housingMapCountyPrices = {};
+    filteredHousingData.forEach(d => {
+      if (!housingMapCountyPrices[d.county]) housingMapCountyPrices[d.county] = [];
+      housingMapCountyPrices[d.county].push(d.price);
+    });
+
+    const avgByCounty = {};
+    Object.entries(housingMapCountyPrices).forEach(([county, prices]) => {
+      avgByCounty[county] = prices.reduce((a, b) => a + b, 0) / prices.length;
+    });
+
+    const mapData = geojson.features.map(feature => {
+      const countyName = feature.properties.NAME || feature.properties.name || '';
+      return { name: countyName, value: Math.round(avgByCounty[countyName] || 0) };
+    });
+
+    if (!echarts.getMap('california')) echarts.registerMap('california', geojson);
+
+    charts.housingMap.setOption({
+      tooltip: { trigger: 'item', formatter: p => `${p.name}<br/>Avg: ${formatCurrency(p.value)}` },
+      visualMap: {
+        min: Math.min(...Object.values(avgByCounty).filter(v=>v>0)) || 0,
+        max: Math.max(...Object.values(avgByCounty)) || 1000000,
+        left: 'left', top: 'bottom', text: ['High', 'Low'], calculable: true,
+        inRange: { color: ['#e0f2fe', '#0ea5e9', '#0284c7', '#0369a1'] }
+      },
+      series: [{ type: 'map', map: 'california', data: mapData }]
+    });
+  }
+
+  function updateAirbnbMap(geojson) {
+    const el = document.getElementById('airbnbMap');
+    if (!el) return;
+    if (!charts.airbnbMap) charts.airbnbMap = echarts.init(el);
+
+    const countyPrices = {};
+    filteredAirbnbData.forEach(d => {
+      if (!countyPrices[d.county]) countyPrices[d.county] = [];
+      countyPrices[d.county].push(d.price);
+    });
+
+    const avgByCounty = {};
+    Object.entries(countyPrices).forEach(([county, prices]) => {
+      avgByCounty[county] = prices.reduce((a, b) => a + b, 0) / prices.length;
+    });
+
+    const mapData = geojson.features.map(feature => {
+      const countyName = feature.properties.NAME || feature.properties.name || '';
+      return { name: countyName, value: Math.round(avgByCounty[countyName] || 0) };
+    });
+
+    charts.airbnbMap.setOption({
+      tooltip: { trigger: 'item', formatter: p => `${p.name}<br/>Avg: ${formatCurrency(p.value)}` },
+      visualMap: {
+        min: Math.min(...Object.values(avgByCounty).filter(v=>v>0)) || 0,
+        max: Math.max(...Object.values(avgByCounty)) || 500,
+        left: 'left', top: 'bottom', text: ['High', 'Low'], calculable: true,
+        inRange: { color: ['#fef3c7', '#fbbf24', '#f59e0b', '#d97706'] }
+      },
+      series: [{ type: 'map', map: 'california', data: mapData }]
+    });
+  }
+
+  function updateCountyFilter() {
+    const countyFilter = document.getElementById('countyFilter');
+    const allCounties = [...new Set([...housingCounties, ...airbnbCounties])].filter(c => c).sort();
+    while (countyFilter.options.length > 1) countyFilter.remove(1);
+    allCounties.forEach(county => {
+      const option = document.createElement('option');
+      option.value = county;
+      option.textContent = county;
+      countyFilter.appendChild(option);
+    });
+  }
+
+  function applyFilters() {
+    const dataset = document.getElementById('datasetFilter').value;
+    const county = document.getElementById('countyFilter').value;
+    const maxPrice = parseInt(document.getElementById('priceRange').value);
+    const bedrooms = document.getElementById('bedroomFilter').value;
+
+    filteredHousingData = housingData.filter(row => {
+      if (dataset === 'airbnb') return false;
+      if (county !== 'all' && row.county !== county) return false;
+      if (row.price > maxPrice) return false;
+      if (bedrooms !== 'all') {
+        if (bedrooms === '4' && row.beds < 4) return false;
+        if (bedrooms !== '4' && row.beds !== parseInt(bedrooms)) return false;
+      }
+      return true;
+    });
+
+    filteredAirbnbData = airbnbData.filter(row => {
+      if (dataset === 'housing') return false;
+      if (county !== 'all' && row.county !== county) return false;
+      if (row.price > maxPrice) return false;
+      if (bedrooms !== 'all') {
+        if (bedrooms === '4' && row.bedrooms < 4) return false;
+        if (bedrooms !== '4' && row.bedrooms !== parseInt(bedrooms)) return false;
+      }
+      return true;
+    });
+
+    updateCharts();
+    updateKPIs();
+  }
+
+  function updateKPIs() {
+    if (filteredHousingData.length > 0) {
+      const prices = filteredHousingData.map(d => d.price).sort((a, b) => a - b);
+      const median = prices[Math.floor(prices.length / 2)];
+      document.getElementById('medianPrice').textContent = formatCurrency(median);
+
+      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+      const change = ((median - avg) / avg * 100).toFixed(1);
+      document.getElementById('priceChange').textContent = `${change > 0 ? '+' : ''}${change}% vs avg`;
+
+      const sizes = filteredHousingData.map(d => d.livingSpace).filter(s => s > 0);
+      const avgSize = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+      document.getElementById('avgSize').textContent = `${formatNumber(avgSize)} sq ft`;
+    }
+
+    if (filteredAirbnbData.length > 0) {
+      const prices = filteredAirbnbData.map(d => d.price);
+      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+      document.getElementById('avgAirbnbPrice').textContent = formatCurrency(avg);
+      document.getElementById('airbnbPriceChange').textContent = `${prices.length} listings`;
+    }
+
+    const total = filteredHousingData.length + filteredAirbnbData.length;
+    document.getElementById('totalListings').textContent = formatNumber(total);
+  }
+
+  function updateCharts() {
+    updateHousingCharts();
+    updateAirbnbCharts();
+    // Reload maps if data changed
+    fetch('data/ca_counties.geojson')
+      .then(r => r.json())
+      .then(g => { updateHousingMap(g); updateAirbnbMap(g); })
+      .catch(()=>{});
+  }
+
+  function updateHousingCharts() {
+    if (filteredHousingData.length === 0) return;
+
+    // Price Over Time (Trend)
+    const priceOverTimeEl = document.getElementById('priceOverTime');
+    if (!charts.priceOverTime) charts.priceOverTime = echarts.init(priceOverTimeEl);
+
+    const housingCountyPrices = {};
+    filteredHousingData.forEach(d => {
+      if (!housingCountyPrices[d.county]) housingCountyPrices[d.county] = [];
+      housingCountyPrices[d.county].push(d.price);
+    });
+
+    const countyAverages = Object.entries(housingCountyPrices).map(([county, prices]) => ({
+      county, avgPrice: prices.reduce((a, b) => a + b, 0) / prices.length, count: prices.length
+    })).sort((a, b) => b.avgPrice - a.avgPrice);
+
+    charts.priceOverTime.setOption({
+      tooltip: { trigger: 'axis', formatter: p => `${p[0].name}<br/>Avg: ${formatCurrency(p[0].value)}` },
+      xAxis: { type: 'category', data: countyAverages.map(d => d.county), axisLabel: { rotate: 45 } },
+      yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+      series: [{ type: 'line', data: countyAverages.map(d => d.avgPrice), smooth: true, itemStyle: { color: '#2563EB' }, lineStyle: { width: 3 } }]
+    });
+
+    // Price Distribution
+    const priceDistEl = document.getElementById('priceDistribution');
+    if (!charts.priceDistribution) charts.priceDistribution = echarts.init(priceDistEl);
+    const prices = filteredHousingData.map(d => d.price).sort((a, b) => a - b);
+    const bins = 20;
+    const minPrice = Math.min(...prices), maxPrice = Math.max(...prices);
+    const binSize = (maxPrice - minPrice) / bins;
+    const histogram = new Array(bins).fill(0);
+    prices.forEach(p => histogram[Math.min(Math.floor((p - minPrice) / binSize), bins - 1)]++);
+
+    charts.priceDistribution.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: histogram.map((_, i) => formatNumber(minPrice + i * binSize)), axisLabel: { rotate: 45, fontSize: 10 } },
+      yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+      series: [{ type: 'bar', data: histogram, itemStyle: { color: '#60A5FA' } }]
+    });
+
+    // Size vs Price
+    const sizeVsPriceEl = document.getElementById('sizeVsPrice');
+    if (!charts.sizeVsPrice) charts.sizeVsPrice = echarts.init(sizeVsPriceEl);
+    const sizePriceData = filteredHousingData.filter(d => d.livingSpace > 0 && d.price > 0).map(d => [d.livingSpace, d.price]);
+    charts.sizeVsPrice.setOption({
+      tooltip: { trigger: 'item' },
+      xAxis: { type: 'value', name: 'Sq Ft', splitLine: { show: false }, axisLabel: { formatter: formatAxisLabel } },
+      yAxis: { type: 'value', name: 'Price', splitLine: { lineStyle: { type: 'dashed' } }, axisLabel: { formatter: formatAxisLabel } },
+      series: [{ type: 'scatter', data: sizePriceData, symbolSize: 4, itemStyle: { color: '#2563EB', opacity: 0.5 } }]
+    });
+
+    // Price by County (Bar)
+    const priceByCountyEl = document.getElementById('priceByCounty');
+    if (!charts.priceByCounty) charts.priceByCounty = echarts.init(priceByCountyEl);
+    charts.priceByCounty.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: countyAverages.map(d=>d.county), axisLabel: { rotate: 45 } },
+      yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+      series: [{ type: 'bar', data: countyAverages.map(d=>d.avgPrice), itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] } }]
+    });
+
+    // Crime & Income (Placeholders if IDs exist)
+    const crimeEl = document.getElementById('priceVsCrime');
+    if (crimeEl) {
+       if (!charts.priceVsCrime) charts.priceVsCrime = echarts.init(crimeEl);
+       const crimeData = filteredHousingData.map(d=>[d.crimeRate, d.price]);
+       charts.priceVsCrime.setOption({
+         xAxis: {type:'value', name:'Crime'}, 
+         yAxis: {type:'value', axisLabel: { formatter: formatAxisLabel }},
+         series: [{type:'scatter', data: crimeData, itemStyle:{color:'#EF4444'}}]
+       });
+    }
+    const incomeEl = document.getElementById('priceVsIncome');
+    if (incomeEl) {
+       if (!charts.priceVsIncome) charts.priceVsIncome = echarts.init(incomeEl);
+       const incomeData = filteredHousingData.map(d=>[d.householdIncome, d.price]);
+       charts.priceVsIncome.setOption({
+         xAxis: {type:'value', name:'Income', axisLabel: { formatter: formatAxisLabel }}, 
+         yAxis: {type:'value', axisLabel: { formatter: formatAxisLabel }},
+         series: [{type:'scatter', data: incomeData, itemStyle:{color:'#10B981'}}]
+       });
+    }
+  }
+
+  function updateAirbnbCharts() {
+    if (filteredAirbnbData.length === 0) return;
+
+    // Room Type
+    const rtEl = document.getElementById('airbnbRoomType');
+    if (!charts.airbnbRoomType) charts.airbnbRoomType = echarts.init(rtEl);
+    const rtCounts = {};
+    filteredAirbnbData.forEach(d => { rtCounts[d.roomType] = (rtCounts[d.roomType] || 0) + 1; });
+    charts.airbnbRoomType.setOption({
+      tooltip: { trigger: 'item' },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'],
+        data: Object.entries(rtCounts).map(([k, v]) => ({ value: v, name: k })),
+        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 }
+      }]
+    });
+
+    // Distribution
+    const distEl = document.getElementById('airbnbPriceDist');
+    if (!charts.airbnbPriceDist) charts.airbnbPriceDist = echarts.init(distEl);
+    const prices = filteredAirbnbData.map(d => d.price).sort((a, b) => a - b);
+
+    // basic histogram:
+    charts.airbnbPriceDist.setOption({
+  grid: {
+    left: 50, right: 20, top: 30, bottom: 40, containLabel: true
+  },
+  xAxis: { type: 'category', data: ['Low', 'Med', 'High'] },
+  yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+  series: [{
+    type: 'bar',
+    data: [prices.length * 0.5, prices.length * 0.3, prices.length * 0.2],
+    itemStyle: { color: '#F59E0B' }
+  }]
+});
+
+    // Bedrooms
+    const bedEl = document.getElementById('airbnbBedrooms');
+    if (!charts.airbnbBedrooms) charts.airbnbBedrooms = echarts.init(bedEl);
+    // logic placeholders
+    charts.airbnbBedrooms.setOption({
+  grid: {
+    left: 50, right: 20, top: 30, bottom: 40, containLabel: true
+  },
+  xAxis: { type: 'category', data: ['1 Bed', '2 Beds', '3 Beds'] },
+  yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+  series: [{ type: 'bar', data: [150, 250, 350], itemStyle: { color: '#8B5CF6' } }]
+});
+
+
+    // Reviews
+    const revEl = document.getElementById('priceVsReviews');
+    if (!charts.priceVsReviews) charts.priceVsReviews = echarts.init(revEl);
+    const revData = filteredAirbnbData.map(d => [d.reviewScores, d.price]);
+    charts.priceVsReviews.setOption({
+  grid: {
+    left: 50, right: 20, top: 30, bottom: 40, containLabel: true
+  },
+  xAxis: { type: 'value', min: 0, max: 10 },
+  yAxis: { type: 'value', axisLabel: { formatter: formatAxisLabel } },
+  series: [{
+    type: 'scatter',
+    data: revData,
+    itemStyle: { color: '#EC4899', opacity: 0.6 }
+  }]
+});
+
+
+  }
+
+  // Resize listener
+  window.addEventListener('resize', function() {
+    Object.values(charts).forEach(c => c && c.resize());
+  });
+</script>
+
+</body>
+</html>
